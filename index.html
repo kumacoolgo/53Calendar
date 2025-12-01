@@ -37,14 +37,14 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 16px;
+      margin-bottom: 10px;
       padding: 0 4px;
     }
 
     .month-nav {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 8px;
     }
 
     .month-title {
@@ -69,6 +69,11 @@
     }
     .btn-icon:active { transform: scale(0.92); background: #f1f5f9; }
 
+    .btn-today {
+      font-size: 12px;
+      font-weight: 600;
+    }
+
     .btn-settings {
       background: var(--text-main);
       color: white;
@@ -84,6 +89,28 @@
       gap: 6px;
     }
     .btn-settings:active { transform: scale(0.96); }
+
+    /* === 明日提醒横幅 === */
+    .tomorrow-banner {
+      margin: 0 4px 14px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #f59e0b, #ef4444);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+    }
+    .tomorrow-banner i {
+      font-size: 16px;
+    }
+    .tomorrow-banner small {
+      font-size: 11px;
+      opacity: 0.9;
+    }
 
     /* === 日历主体 === */
     .calendar-container {
@@ -425,12 +452,15 @@
   <div class="month-nav">
     <button class="btn-icon" id="prevMonth" aria-label="前の月へ"><i class="fa-solid fa-chevron-left"></i></button>
     <div class="month-title" id="monthLabel"></div>
+    <button class="btn-icon btn-today" id="todayBtn" title="今日に戻る">今日</button>
     <button class="btn-icon" id="nextMonth" aria-label="次の月へ"><i class="fa-solid fa-chevron-right"></i></button>
   </div>
   <button class="btn-settings" id="openSettings">
     <i class="fa-solid fa-sliders"></i> 設定
   </button>
 </div>
+
+<!-- 明日提醒横幅：JS 动态插入到这里 -->
 
 <div class="calendar-container">
   <div class="calendar-inner">
@@ -482,7 +512,6 @@
 </div>
 
 <script>
-  // ==== 颜色轮盘 ====
   const COLOR_PALETTE = [
     { bgColor: "#fee2e2", textColor: "#991b1b", color: "#ef4444" },
     { bgColor: "#fef3c7", textColor: "#92400e", color: "#f59e0b" },
@@ -494,7 +523,6 @@
     { bgColor: "#e0f2fe", textColor: "#075985", color: "#0ea5e9" }
   ];
 
-  // 默认分类
   const DEFAULT_TYPES = [
     { id: "burnable",    label: "燃やすごみ",       color: "#ef4444", bgColor: "#fee2e2", textColor: "#991b1b", icon: "fa-fire" },
     { id: "nonburnable", label: "燃やさないごみ",   color: "#374151", bgColor: "#f3f4f6", textColor: "#374151", icon: "fa-battery-full" },
@@ -505,7 +533,6 @@
     { id: "cloth",       label: "古布",             color: "#a21caf", bgColor: "#fae8ff", textColor: "#86198f", icon: "fa-shirt" }
   ];
 
-  // 默认规则
   const DEFAULT_RULES = {
     burnable:    { mode: "weekly", weekdays: [3, 6], nth: [] },
     nonburnable: { mode: "nth",    weekdays: [1],    nth: [1, 3] },
@@ -593,6 +620,10 @@
 
     document.getElementById("prevMonth").onclick = () => changeMonth(-1);
     document.getElementById("nextMonth").onclick = () => changeMonth(1);
+    document.getElementById("todayBtn").onclick = () => {
+      currentDate = new Date();
+      renderCalendar();
+    };
 
     document.getElementById("openSettings").onclick = () => {
       renderSettingsUI();
@@ -695,6 +726,8 @@
         grid.appendChild(cell);
       }
     }
+
+    renderTomorrowBanner(); // 每次渲染顺便更新明日提醒
   }
 
   function renderLegend() {
@@ -893,6 +926,33 @@
     if (!el) return;
     if (show) el.classList.add("active");
     else el.classList.remove("active");
+  }
+
+  function renderTomorrowBanner() {
+    const old = document.getElementById("tomorrowBanner");
+    if (old) old.remove();
+
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const list = getGarbageList(tomorrow);
+    if (!list.length) return;
+
+    const banner = document.createElement("div");
+    banner.id = "tomorrowBanner";
+    banner.className = "tomorrow-banner";
+
+    const labels = list.map(t => t.label).join("・");
+    banner.innerHTML = `
+      <i class="fa-solid fa-bell"></i>
+      <div>
+        <div>明日（${tomorrow.getMonth()+1}月${tomorrow.getDate()}日）は <strong>${labels}</strong> の日です。</div>
+        <small>出し忘れ注意！</small>
+      </div>
+    `;
+
+    const header = document.querySelector(".header");
+    header.insertAdjacentElement("afterend", banner);
   }
 
   init();
