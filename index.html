@@ -9,6 +9,12 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="theme-color" content="#f8fafc">
 
+  <!-- PWA 用（可选）-->
+  <link rel="manifest" href="manifest.json">
+
+  <link rel="apple-touch-icon" href="icon.png">
+  <link rel="icon" type="image/png" href="icon.png">
+
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
   <style>
@@ -57,9 +63,9 @@
       width: 36px;
       height: 36px;
       border-radius: 50%;
-      border: none;
+      border: 1px solid var(--border);
       background: #ffffff;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -72,6 +78,9 @@
     .btn-today {
       font-size: 12px;
       font-weight: 600;
+      width: auto;
+      padding: 0 12px;
+      border-radius: 20px;
     }
 
     .btn-settings {
@@ -92,24 +101,36 @@
 
     /* === 明日提醒横幅 === */
     .tomorrow-banner {
-      margin: 0 4px 14px;
-      padding: 10px 12px;
-      border-radius: 12px;
+      margin: 0 0 16px;
+      padding: 12px 16px;
+      border-radius: 16px;
       background: linear-gradient(135deg, #f59e0b, #ef4444);
       color: #fff;
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 600;
       display: flex;
-      align-items: center;
-      gap: 8px;
-      box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+      align-items: flex-start;
+      gap: 12px;
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
+      animation: slideDown 0.3s ease-out;
+    }
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
     }
     .tomorrow-banner i {
-      font-size: 16px;
+      font-size: 18px;
+      margin-top: 2px;
+    }
+    .tomorrow-banner .banner-content {
+      display: flex;
+      flex-direction: column;
     }
     .tomorrow-banner small {
       font-size: 11px;
       opacity: 0.9;
+      font-weight: 400;
+      margin-top: 2px;
     }
 
     /* === 日历主体 === */
@@ -123,7 +144,7 @@
     }
 
     .calendar-inner {
-      min-width: 640px;
+      min-width: 600px;
     }
 
     .weekdays {
@@ -209,6 +230,7 @@
       gap: 8px;
       margin-top: 16px;
       justify-content: center;
+      padding-bottom: 20px;
     }
     .legend-item {
       display: flex;
@@ -223,6 +245,7 @@
     }
     .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
 
+    /* モーダル共通 */
     .modal-overlay {
       position: fixed;
       inset: 0;
@@ -294,6 +317,7 @@
       gap: 10px;
     }
 
+    /* 設定画面用 */
     .settings-list { display: flex; flex-direction: column; gap: 16px; }
 
     .setting-group {
@@ -327,6 +351,15 @@
       cursor: pointer;
       padding: 4px;
       border-radius: 50%;
+    }
+
+    /* 無効バッジ */
+    .badge-muted {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: #e5e7eb;
+      color: #6b7280;
     }
 
     .mode-selector {
@@ -407,6 +440,7 @@
       margin-bottom: 12px;
     }
 
+    /* 詳細画面用 */
     .detail-date { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
     .detail-meta { color: var(--text-sub); font-size: 13px; margin-bottom: 16px; }
     
@@ -460,7 +494,7 @@
   </button>
 </div>
 
-<!-- 明日提醒横幅：JS 动态插入到这里 -->
+<div id="bannerContainer"></div>
 
 <div class="calendar-container">
   <div class="calendar-inner">
@@ -473,7 +507,6 @@
 
 <div class="legend" id="legendContainer"></div>
 
-<!-- 详情弹窗 -->
 <div class="modal-overlay" id="detailModal">
   <div class="modal-card">
     <div class="modal-header">
@@ -486,12 +519,11 @@
       <div id="detailList"></div>
     </div>
     <div class="modal-footer">
-      <button class="btn-save" style="width:100%" id="okDetail">OK</button>
+      <button class="btn-save" style="width:100%" id="okDetail">閉じる</button>
     </div>
   </div>
 </div>
 
-<!-- 设置弹窗 -->
 <div class="modal-overlay" id="settingsModal">
   <div class="modal-card">
     <div class="modal-header">
@@ -543,12 +575,26 @@
     cloth:       { mode: "weekly", weekdays: [5],    nth: [] }
   };
 
-  const STORAGE_KEY = "gomi-app-v4";
+  const STORAGE_KEY = "gomi-app-v5";
 
   let types = [];
   let rules = {};
   let currentDate = new Date();
-  const TODAY = new Date();
+  let renderTimer = null;
+
+  // 今日（00:00:00）を取得
+  function getToday() {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  // 明日（00:00:00）
+  function getTomorrow() {
+    const t = getToday();
+    t.setDate(t.getDate() + 1);
+    return t;
+  }
 
   function createDefaultState() {
     return {
@@ -620,6 +666,7 @@
 
     document.getElementById("prevMonth").onclick = () => changeMonth(-1);
     document.getElementById("nextMonth").onclick = () => changeMonth(1);
+    
     document.getElementById("todayBtn").onclick = () => {
       currentDate = new Date();
       renderCalendar();
@@ -656,9 +703,13 @@
     });
   }
 
+  // 月変更 + 軽い防抖
   function changeMonth(delta) {
     currentDate.setMonth(currentDate.getMonth() + delta);
-    renderCalendar();
+    if (renderTimer) cancelAnimationFrame(renderTimer);
+    renderTimer = requestAnimationFrame(() => {
+      renderCalendar();
+    });
   }
 
   function renderCalendar() {
@@ -670,6 +721,7 @@
     const lastDay = new Date(y, m + 1, 0);
     const startWeek = firstDay.getDay();
     const totalDays = lastDay.getDate();
+    const todayObj = getToday();
 
     const grid = document.getElementById("calendarGrid");
     grid.innerHTML = "";
@@ -682,6 +734,8 @@
 
     for (let d = 1; d <= totalDays; d++) {
       const date = new Date(y, m, d);
+      date.setHours(0, 0, 0, 0); // 時分秒を0に揃える
+
       const cell = document.createElement("div");
       cell.className = "day-cell";
 
@@ -689,7 +743,7 @@
       if (w === 0) cell.classList.add("sun");
       if (w === 6) cell.classList.add("sat");
 
-      if (date.toDateString() === TODAY.toDateString()) {
+      if (date.getTime() === todayObj.getTime()) {
         cell.classList.add("today");
       }
 
@@ -727,7 +781,31 @@
       }
     }
 
-    renderTomorrowBanner(); // 每次渲染顺便更新明日提醒
+    renderTomorrowBanner(); 
+  }
+
+  // 明日のごみ出しバナー表示
+  function renderTomorrowBanner() {
+    const container = document.getElementById("bannerContainer");
+    container.innerHTML = "";
+
+    const tomorrow = getTomorrow();
+    const list = getGarbageList(tomorrow);
+    if (!list.length) return;
+
+    const banner = document.createElement("div");
+    banner.className = "tomorrow-banner";
+
+    const labels = list.map(t => t.label).join("・");
+    banner.innerHTML = `
+      <i class="fa-solid fa-bell"></i>
+      <div class="banner-content">
+        <div>明日（${tomorrow.getMonth()+1}月${tomorrow.getDate()}日）は <strong>${labels}</strong> の日です。</div>
+        <small>出し忘れにご注意ください</small>
+      </div>
+    `;
+
+    container.appendChild(banner);
   }
 
   function renderLegend() {
@@ -849,15 +927,26 @@
       wrapper.className = "setting-group";
       wrapper.dataset.id = type.id;
 
+      // 無効判定
+      const disabled =
+        rule.mode === "off" ||
+        rule.weekdays.length === 0 ||
+        (rule.mode === "nth" && rule.nth.length === 0);
+
+      const disabledBadge = disabled ? '<span class="badge-muted">無効</span>' : "";
+
       wrapper.innerHTML = `
         <div class="setting-header">
           <div class="setting-title">
             <div class="setting-indicator" style="background:${type.color}"></div>
             ${type.label}
           </div>
-          <button class="delete-type-btn" type="button" title="削除" data-delete="${type.id}">
-            <i class="fa-solid fa-trash-can"></i>
-          </button>
+          <div style="display:flex;align-items:center;gap:6px;">
+            ${disabledBadge}
+            <button class="delete-type-btn" type="button" title="削除" data-delete="${type.id}">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </div>
         </div>
         <div class="mode-selector">
           <div class="mode-option ${rule.mode === "weekly" ? "active" : ""}" data-mode="weekly">毎週</div>
@@ -926,33 +1015,6 @@
     if (!el) return;
     if (show) el.classList.add("active");
     else el.classList.remove("active");
-  }
-
-  function renderTomorrowBanner() {
-    const old = document.getElementById("tomorrowBanner");
-    if (old) old.remove();
-
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    const list = getGarbageList(tomorrow);
-    if (!list.length) return;
-
-    const banner = document.createElement("div");
-    banner.id = "tomorrowBanner";
-    banner.className = "tomorrow-banner";
-
-    const labels = list.map(t => t.label).join("・");
-    banner.innerHTML = `
-      <i class="fa-solid fa-bell"></i>
-      <div>
-        <div>明日（${tomorrow.getMonth()+1}月${tomorrow.getDate()}日）は <strong>${labels}</strong> の日です。</div>
-        <small>出し忘れ注意！</small>
-      </div>
-    `;
-
-    const header = document.querySelector(".header");
-    header.insertAdjacentElement("afterend", banner);
   }
 
   init();
