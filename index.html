@@ -1,333 +1,1007 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>垃圾回收日历 (ゴミ収集カレンダー)</title>
-    
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <meta charset="UTF-8" />
+  <title>ごみ収集日カレンダー</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
-        
-        /* 桌面端样式 */
-        .calendar-grid { border: 2px solid black; }
-        .calendar-cell { border: 1px solid black; min-height: 120px; transition: background-color 0.2s; cursor: pointer; }
-        .calendar-header { border-bottom: 2px solid black; border-right: 1px solid black; }
-        .calendar-header:last-child { border-right: none; }
+  <style>
+    :root {
+      --bg: #f3f4f6;
+      --card-bg: #ffffff;
+      --accent: #10b981;
+      --border: #e5e7eb;
+      --text-main: #111827;
+      --text-muted: #6b7280;
+    }
 
-        /* 手机端特别优化 */
-        @media (max-width: 768px) {
-            .calendar-cell { min-height: 80px; } /* 手机上格子高度减小 */
-            .calendar-grid { border: 1px solid #ddd; border-radius: 8px; overflow: hidden; } /* 手机上圆角柔和边框 */
-            .calendar-cell { border: 1px solid #eee; border-top: none; border-left: none; }
-            .calendar-header { border-bottom: 1px solid #ddd; border-right: none; font-size: 0.9rem; }
-        }
-        
-        /* 垃圾类型颜色定义 */
-        .tag-burnable { background-color: #fee2e2; color: #991b1b; } 
-        .tag-nonburnable { background-color: #f3f4f6; color: #1f2937; }
-        .tag-plastic { background-color: #dbeafe; color: #1e40af; }
-        .tag-resource { background-color: #fef9c3; color: #854d0e; }
-        .tag-pet { background-color: #dcfce7; color: #166534; }
+    * { box-sizing: border-box; }
 
-        /* 弹窗动画 */
-        .modal-enter { animation: fadeIn 0.2s ease-out forwards; }
-        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-    </style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 12px;
+      background: radial-gradient(circle at top, #e0f2fe, #f9fafb 50%, #e5e7eb 100%);
+      color: var(--text-main);
+    }
+
+    .app {
+      max-width: 960px;
+      margin: 0 auto;
+      background: var(--card-bg);
+      padding: 14px 14px 18px;
+      border-radius: 16px;
+      box-shadow:
+        0 18px 40px rgba(15, 23, 42, 0.15),
+        0 0 0 1px rgba(148, 163, 184, 0.25);
+    }
+
+    .calendar-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .calendar-header-left,
+    .calendar-header-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn {
+      cursor: pointer;
+      border-radius: 999px;
+      border: 1px solid #d1d5db;
+      padding: 6px 12px;
+      background: #f9fafb;
+      font-size: 13px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: background 0.15s, box-shadow 0.15s, transform 0.05s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn:active {
+      transform: translateY(1px);
+      box-shadow: inset 0 1px 2px rgba(0,0,0,0.12);
+    }
+    .btn:hover { background: #edf2ff; }
+
+    .btn-primary {
+      background: var(--accent);
+      border-color: #059669;
+      color: #ecfdf5;
+      font-weight: 500;
+    }
+    .btn-primary:hover { background: #059669; }
+
+    #monthLabel {
+      font-weight: 700;
+      font-size: 18px;
+      letter-spacing: 0.04em;
+    }
+
+    .calendar-wrapper {
+      overflow-x: auto;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #f9fafb;
+    }
+
+    table.calendar {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 12px;
+      min-width: 600px; /* 手机太窄时可以左右滑动 */
+    }
+
+    .calendar th,
+    .calendar td {
+      border: 1px solid #e5e7eb;
+      height: 80px;
+      vertical-align: top;
+      position: relative;
+      padding: 4px 4px 4px 6px;
+      background: #ffffff;
+    }
+
+    .calendar th {
+      background: #f3f4f6;
+      font-weight: 600;
+      font-size: 11px;
+      text-align: center;
+      padding: 6px 0;
+    }
+
+    .calendar th.sun,
+    .calendar td.sun { color: #dc2626; }
+    .calendar th.sat,
+    .calendar td.sat { color: #2563eb; }
+
+    .calendar td {
+      cursor: pointer;
+      touch-action: manipulation;
+      transition: background 0.12s, box-shadow 0.12s;
+    }
+    .calendar td:hover { background: #eff6ff; }
+    .calendar td:active {
+      background: #dbeafe;
+      box-shadow: inset 0 0 0 1px #93c5fd;
+    }
+
+    /* 今天高亮：黄色背景 + 边框 */
+    .calendar td.today {
+      background: #fef9c3;
+      box-shadow: inset 0 0 0 2px #facc15;
+      position: relative;
+    }
+    .calendar td.today:hover {
+      background: #fef3c7;
+    }
+
+    .date-number {
+      position: absolute;
+      right: 5px;
+      top: 4px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .labels {
+      margin-top: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      font-size: 10px;
+    }
+
+    .label {
+      border-radius: 999px;
+      padding: 2px 6px;
+      line-height: 1.2;
+      word-break: break-all;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      border: 1px solid rgba(148, 163, 184, 0.4);
+    }
+
+    .label-burnable       { background: #fee2e2; }
+    .label-nonburnable    { background: #fef3c7; }
+    .label-plastic        { background: #dbeafe; }
+    .label-paper          { background: #fef9c3; }
+    .label-pet            { background: #dcfce7; }
+    .label-tray           { background: #e0e7ff; }
+    .label-cloth          { background: #fae8ff; }
+
+    .legend {
+      margin-top: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+    }
+    .legend-color {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+    }
+
+    /* 通用浮层（设置 & 每日详情） */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.35);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 16px;
+    }
+
+    .panel {
+      background: #ffffff;
+      max-width: 720px;
+      width: 100%;
+      max-height: 90vh;
+      border-radius: 16px;
+      padding: 16px 14px 14px;
+      box-shadow:
+        0 24px 60px rgba(15, 23, 42, 0.45),
+        0 0 0 1px rgba(148, 163, 184, 0.6);
+      overflow: auto;
+      font-size: 13px;
+    }
+
+    .panel h2 {
+      margin: 0 0 6px;
+      font-size: 16px;
+    }
+
+    .panel small { color: var(--text-muted); }
+
+    #settingsTable {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 12px;
+    }
+
+    #settingsTable th,
+    #settingsTable td {
+      border: 1px solid #e5e7eb;
+      padding: 4px;
+      vertical-align: top;
+      background: #ffffff;
+    }
+
+    #settingsTable th {
+      background: #f3f4f6;
+      font-weight: 600;
+    }
+
+    .weekday-group label,
+    .nth-group label {
+      margin-right: 4px;
+      white-space: nowrap;
+      display: inline-block;
+    }
+
+    .settings-footer {
+      margin-top: 12px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    /* 每日详情弹窗样式 */
+    #dayTitle {
+      font-size: 16px;
+      margin-bottom: 8px;
+    }
+
+    #daySubtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    #dayList {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 4px;
+      margin-bottom: 10px;
+    }
+
+    .day-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 10px;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      font-size: 13px;
+    }
+
+    .day-item-label { font-weight: 500; }
+
+    .day-item-tag {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .day-empty {
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: #f9fafb;
+      border: 1px dashed #d1d5db;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .panel-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    @media (max-width: 640px) {
+      body { padding: 8px; }
+      .app {
+        padding: 12px 10px 14px;
+        border-radius: 14px;
+        box-shadow:
+          0 10px 30px rgba(15, 23, 42, 0.2),
+          0 0 0 1px rgba(148, 163, 184, 0.45);
+      }
+      #monthLabel { font-size: 17px; }
+      table.calendar { font-size: 11px; }
+      .calendar th,
+      .calendar td { height: 72px; }
+      .labels { font-size: 9px; }
+      .panel {
+        max-width: 100%;
+        padding: 14px 12px 12px;
+        border-radius: 14px;
+      }
+    }
+  </style>
 </head>
-<body class="bg-gray-50 text-gray-900 pb-10">
+<body>
+<div class="app">
+  <div class="calendar-header">
+    <div class="calendar-header-left">
+      <button class="btn" id="prevMonth">＜</button>
+      <span id="monthLabel"></span>
+      <button class="btn" id="nextMonth">＞</button>
+    </div>
+    <div class="calendar-header-right">
+      <button class="btn btn-primary" id="openSettings">設定</button>
+    </div>
+  </div>
 
-    <div id="root"></div>
+  <div class="calendar-wrapper">
+    <table class="calendar">
+      <thead>
+      <tr>
+        <th class="sun">日</th>
+        <th>月</th>
+        <th>火</th>
+        <th>水</th>
+        <th>木</th>
+        <th>金</th>
+        <th class="sat">土</th>
+      </tr>
+      </thead>
+      <tbody id="calendarBody">
+      <!-- JS 生成 -->
+      </tbody>
+    </table>
+  </div>
 
-    <script type="text/babel">
-        const { useState, useEffect } = React;
+  <!-- 颜色说明 -->
+  <div class="legend">
+    <div class="legend-item">
+      <span class="legend-color" style="background:#fee2e2"></span><span>燃やすごみ</span>
+    </div>
+    <div class="legend-item">
+      <span class="legend-color" style="background:#fef3c7"></span><span>燃やさないごみ</span>
+    </div>
+    <div class="legend-item">
+      <span class="legend-color" style="background:#dbeafe"></span><span>プラスチック</span>
+    </div>
+    <div class="legend-item">
+      <span class="legend-color" style="background:#fef9c3"></span><span>古紙・びん・缶</span>
+    </div>
+    <div class="legend-item">
+      <span class="legend-color" style="background:#dcfce7"></span><span>ペットボトル</span>
+    </div>
+    <div class="legend-item">
+      <span class="legend-color" style="background:#e0e7ff"></span><span>発泡トレイ</span>
+    </div>
+    <div class="legend-item">
+      <span class="legend-color" style="background:#fae8ff"></span><span>古布</span>
+    </div>
+  </div>
+</div>
 
-        const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
-        const DEFAULT_RULES = [
-            { id: 1, name: '燃やすごみ', style: 'tag-burnable', colorCode: '#ef4444', days: [3, 6], weeks: [1, 2, 3, 4, 5] },
-            { id: 2, name: '燃やさないごみ', style: 'tag-nonburnable', colorCode: '#6b7280', days: [1], weeks: [1, 3] },
-            { id: 3, name: 'プラスチック', style: 'tag-plastic', colorCode: '#3b82f6', days: [2], weeks: [1, 2, 3, 4, 5] },
-            { id: 4, name: '古紙・びん・缶', style: 'tag-resource', colorCode: '#eab308', days: [2], weeks: [2, 4] },
-            { id: 5, name: 'ペットボトル', style: 'tag-pet', colorCode: '#22c55e', days: [5], weeks: [1, 2, 3, 4, 5] },
-            { id: 6, name: '発泡スチロール', style: 'tag-pet', colorCode: '#22c55e', days: [5], weeks: [1, 2, 3, 4, 5] },
-            { id: 7, name: '古布', style: 'tag-pet', colorCode: '#22c55e', days: [5], weeks: [1, 2, 3, 4, 5] },
-        ];
+<!-- 设置弹窗 -->
+<div class="overlay" id="settingsOverlay">
+  <div class="panel">
+    <h2>収集日設定</h2>
+    <small>※「毎週」はチェックされた曜日すべてが収集日になります。「第○」を選ぶと、チェックした週だけ収集されます。</small>
 
-        function App() {
-            // 默认设置为当前时间
-            const [date, setDate] = useState(new Date()); 
-            const [rules, setRules] = useState(DEFAULT_RULES);
-            const [view, setView] = useState('calendar');
-            
-            // 弹窗状态
-            const [selectedDayInfo, setSelectedDayInfo] = useState(null); // { day: 1, garbageList: [], weekDay: '月' }
+    <table id="settingsTable">
+      <thead>
+      <tr>
+        <th style="width: 120px;">ごみの種類</th>
+        <th>収集ルール</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr data-id="burnable">
+        <td>燃やすごみ</td>
+        <td>
+          <div>
+            モード：
+            <select class="mode">
+              <option value="weekly">毎週</option>
+              <option value="nth">第○週のみ</option>
+              <option value="off">収集なし</option>
+            </select>
+          </div>
+          <div>
+            曜日：
+            <span class="weekday-group">
+              <label><input type="checkbox" value="0">日</label>
+              <label><input type="checkbox" value="1">月</label>
+              <label><input type="checkbox" value="2">火</label>
+              <label><input type="checkbox" value="3">水</label>
+              <label><input type="checkbox" value="4">木</label>
+              <label><input type="checkbox" value="5">金</label>
+              <label><input type="checkbox" value="6">土</label>
+            </span>
+          </div>
+          <div>
+            週：
+            <span class="nth-group">
+              <label><input type="checkbox" value="1">第1</label>
+              <label><input type="checkbox" value="2">第2</label>
+              <label><input type="checkbox" value="3">第3</label>
+              <label><input type="checkbox" value="4">第4</label>
+              <label><input type="checkbox" value="5">第5</label>
+            </span>
+          </div>
+        </td>
+      </tr>
 
-            const getDaysInMonth = (d) => new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-            const getFirstDayOfMonth = (d) => new Date(d.getFullYear(), d.getMonth(), 1).getDay();
+      <tr data-id="nonburnable">
+        <td>燃やさないごみ</td>
+        <td>
+          <div>
+            モード：
+            <select class="mode">
+              <option value="weekly">毎週</option>
+              <option value="nth">第○週のみ</option>
+              <option value="off">収集なし</option>
+            </select>
+          </div>
+          <div>
+            曜日：
+            <span class="weekday-group">
+              <label><input type="checkbox" value="0">日</label>
+              <label><input type="checkbox" value="1">月</label>
+              <label><input type="checkbox" value="2">火</label>
+              <label><input type="checkbox" value="3">水</label>
+              <label><input type="checkbox" value="4">木</label>
+              <label><input type="checkbox" value="5">金</label>
+              <label><input type="checkbox" value="6">土</label>
+            </span>
+          </div>
+          <div>
+            週：
+            <span class="nth-group">
+              <label><input type="checkbox" value="1">第1</label>
+              <label><input type="checkbox" value="2">第2</label>
+              <label><input type="checkbox" value="3">第3</label>
+              <label><input type="checkbox" value="4">第4</label>
+              <label><input type="checkbox" value="5">第5</label>
+            </span>
+          </div>
+        </td>
+      </tr>
 
-            const getGarbageForDay = (dayNum) => {
-                if (!dayNum) return [];
-                const currentDayDate = new Date(date.getFullYear(), date.getMonth(), dayNum);
-                const dayOfWeek = currentDayDate.getDay();
-                const nthWeek = Math.floor((dayNum - 1) / 7) + 1;
+      <tr data-id="plastic">
+        <td>プラスチック</td>
+        <td>
+          <div>
+            モード：
+            <select class="mode">
+              <option value="weekly">毎週</option>
+              <option value="nth">第○週のみ</option>
+              <option value="off">収集なし</option>
+            </select>
+          </div>
+          <div>
+            曜日：
+            <span class="weekday-group">
+              <label><input type="checkbox" value="0">日</label>
+              <label><input type="checkbox" value="1">月</label>
+              <label><input type="checkbox" value="2">火</label>
+              <label><input type="checkbox" value="3">水</label>
+              <label><input type="checkbox" value="4">木</label>
+              <label><input type="checkbox" value="5">金</label>
+              <label><input type="checkbox" value="6">土</label>
+            </span>
+          </div>
+          <div>
+            週：
+            <span class="nth-group">
+              <label><input type="checkbox" value="1">第1</label>
+              <label><input type="checkbox" value="2">第2</label>
+              <label><input type="checkbox" value="3">第3</label>
+              <label><input type="checkbox" value="4">第4</label>
+              <label><input type="checkbox" value="5">第5</label>
+            </span>
+          </div>
+        </td>
+      </tr>
 
-                return rules.filter(rule => {
-                    return rule.days.includes(dayOfWeek) && rule.weeks.includes(nthWeek);
-                });
-            };
+      <tr data-id="paper">
+        <td>古紙・びん・缶</td>
+        <td>
+          <div>
+            モード：
+            <select class="mode">
+              <option value="weekly">毎週</option>
+              <option value="nth">第○週のみ</option>
+              <option value="off">収集なし</option>
+            </select>
+          </div>
+          <div>
+            曜日：
+            <span class="weekday-group">
+              <label><input type="checkbox" value="0">日</label>
+              <label><input type="checkbox" value="1">月</label>
+              <label><input type="checkbox" value="2">火</label>
+              <label><input type="checkbox" value="3">水</label>
+              <label><input type="checkbox" value="4">木</label>
+              <label><input type="checkbox" value="5">金</label>
+              <label><input type="checkbox" value="6">土</label>
+            </span>
+          </div>
+          <div>
+            週：
+            <span class="nth-group">
+              <label><input type="checkbox" value="1">第1</label>
+              <label><input type="checkbox" value="2">第2</label>
+              <label><input type="checkbox" value="3">第3</label>
+              <label><input type="checkbox" value="4">第4</label>
+              <label><input type="checkbox" value="5">第5</label>
+            </span>
+          </div>
+        </td>
+      </tr>
 
-            const changeMonth = (offset) => {
-                setDate(new Date(date.getFullYear(), date.getMonth() + offset, 1));
-            };
+      <tr data-id="pet">
+        <td>ペットボトル</td>
+        <td>
+          <div>
+            モード：
+            <select class="mode">
+              <option value="weekly">毎週</option>
+              <option value="nth">第○週のみ</option>
+              <option value="off">収集なし</option>
+            </select>
+          </div>
+          <div>
+            曜日：
+            <span class="weekday-group">
+              <label><input type="checkbox" value="0">日</label>
+              <label><input type="checkbox" value="1">月</label>
+              <label><input type="checkbox" value="2">火</label>
+              <label><input type="checkbox" value="3">水</label>
+              <label><input type="checkbox" value="4">木</label>
+              <label><input type="checkbox" value="5">金</label>
+              <label><input type="checkbox" value="6">土</label>
+            </span>
+          </div>
+          <div>
+            週：
+            <span class="nth-group">
+              <label><input type="checkbox" value="1">第1</label>
+              <label><input type="checkbox" value="2">第2</label>
+              <label><input type="checkbox" value="3">第3</label>
+              <label><input type="checkbox" value="4">第4</label>
+              <label><input type="checkbox" value="5">第5</label>
+            </span>
+          </div>
+        </td>
+      </tr>
 
-            // 处理日期点击
-            const handleDayClick = (day, garbageList, weekDayIndex) => {
-                if (!day) return;
-                setSelectedDayInfo({
-                    day,
-                    garbageList,
-                    weekDay: WEEKDAYS[weekDayIndex],
-                    dateObj: new Date(date.getFullYear(), date.getMonth(), day)
-                });
-            };
+      <tr data-id="tray">
+        <td>発泡スチロール製食品用トレイ</td>
+        <td>
+          <div>
+            モード：
+            <select class="mode">
+              <option value="weekly">毎週</option>
+              <option value="nth">第○週のみ</option>
+              <option value="off">収集なし</option>
+            </select>
+          </div>
+          <div>
+            曜日：
+            <span class="weekday-group">
+              <label><input type="checkbox" value="0">日</label>
+              <label><input type="checkbox" value="1">月</label>
+              <label><input type="checkbox" value="2">火</label>
+              <label><input type="checkbox" value="3">水</label>
+              <label><input type="checkbox" value="4">木</label>
+              <label><input type="checkbox" value="5">金</label>
+              <label><input type="checkbox" value="6">土</label>
+            </span>
+          </div>
+          <div>
+            週：
+            <span class="nth-group">
+              <label><input type="checkbox" value="1">第1</label>
+              <label><input type="checkbox" value="2">第2</label>
+              <label><input type="checkbox" value="3">第3</label>
+              <label><input type="checkbox" value="4">第4</label>
+              <label><input type="checkbox" value="5">第5</label>
+            </span>
+          </div>
+        </td>
+      </tr>
 
-            // 关闭弹窗
-            const closeModal = () => setSelectedDayInfo(null);
+      <tr data-id="cloth">
+        <td>古布</td>
+        <td>
+          <div>
+            モード：
+            <select class="mode">
+              <option value="weekly">毎週</option>
+              <option value="nth">第○週のみ</option>
+              <option value="off">収集なし</option>
+            </select>
+          </div>
+          <div>
+            曜日：
+            <span class="weekday-group">
+              <label><input type="checkbox" value="0">日</label>
+              <label><input type="checkbox" value="1">月</label>
+              <label><input type="checkbox" value="2">火</label>
+              <label><input type="checkbox" value="3">水</label>
+              <label><input type="checkbox" value="4">木</label>
+              <label><input type="checkbox" value="5">金</label>
+              <label><input type="checkbox" value="6">土</label>
+            </span>
+          </div>
+          <div>
+            週：
+            <span class="nth-group">
+              <label><input type="checkbox" value="1">第1</label>
+              <label><input type="checkbox" value="2">第2</label>
+              <label><input type="checkbox" value="3">第3</label>
+              <label><input type="checkbox" value="4">第4</label>
+              <label><input type="checkbox" value="5">第5</label>
+            </span>
+          </div>
+        </td>
+      </tr>
 
-            // --- 渲染设置页面 ---
-            if (view === 'settings') {
-                return (
-                    <div className="min-h-screen bg-white">
-                        <div className="sticky top-0 bg-white border-b px-4 py-3 flex justify-between items-center z-10 shadow-sm">
-                            <h2 className="text-lg font-bold text-gray-800">
-                                <i className="fa-solid fa-gear mr-2 text-gray-500"></i>収集日設定
-                            </h2>
-                            <button onClick={() => setView('calendar')} className="bg-black text-white px-4 py-1.5 rounded-full text-sm font-bold shadow hover:bg-gray-800 transition">
-                                完了
-                            </button>
-                        </div>
-                        <div className="p-4 pb-20 overflow-y-auto">
-                            {rules.map((rule, index) => (
-                                <div key={rule.id} className="mb-6 border-b pb-4 last:border-0">
-                                    <div className="flex items-center mb-3">
-                                        <div className={`w-3 h-3 rounded-full mr-2 ${rule.style.replace('text-', 'bg-').split(' ')[0]}`}></div>
-                                        <span className="font-bold text-gray-900">{rule.name}</span>
-                                    </div>
-                                    
-                                    <div className="mb-3">
-                                        <p className="text-xs text-gray-500 mb-1">曜日选择:</p>
-                                        <div className="flex gap-2">
-                                            {WEEKDAYS.map((wd, wIndex) => {
-                                                const isActive = rule.days.includes(wIndex);
-                                                return (
-                                                    <button
-                                                        key={wIndex}
-                                                        onClick={() => {
-                                                            const newRules = [...rules];
-                                                            if (isActive) newRules[index].days = newRules[index].days.filter(d => d !== wIndex);
-                                                            else newRules[index].days.push(wIndex);
-                                                            setRules(newRules);
-                                                        }}
-                                                        className={`w-9 h-9 rounded-full text-sm font-bold flex items-center justify-center transition-colors ${
-                                                            isActive 
-                                                            ? 'bg-blue-600 text-white shadow-md' 
-                                                            : 'bg-gray-100 text-gray-400'
-                                                        }`}
-                                                    >
-                                                        {wd}
-                                                    </button>
-                                                )
-                                            })}
-                                        </div>
-                                    </div>
+      </tbody>
+    </table>
 
-                                    <div>
-                                        <p className="text-xs text-gray-500 mb-1">频率:</p>
-                                        <select 
-                                            className="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg p-2.5"
-                                            value={rule.weeks.length === 5 ? 'all' : rule.weeks.join(',')}
-                                            onChange={(e) => {
-                                                const val = e.target.value;
-                                                const newRules = [...rules];
-                                                if (val === 'all') newRules[index].weeks = [1, 2, 3, 4, 5];
-                                                else newRules[index].weeks = val.split(',').map(Number);
-                                                setRules(newRules);
-                                            }}
-                                        >
-                                            <option value="all">毎週</option>
-                                            <option value="1,3">第1・3週</option>
-                                            <option value="2,4">第2・4週</option>
-                                            <option value="1">第1週のみ</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                );
-            }
+    <div class="settings-footer">
+      <button class="btn" id="closeSettings">キャンセル</button>
+      <button class="btn btn-primary" id="saveSettings">保存</button>
+    </div>
+  </div>
+</div>
 
-            // --- 渲染日历视图 ---
-            const totalDays = getDaysInMonth(date);
-            const firstDay = getFirstDayOfMonth(date);
-            const blanks = Array(firstDay).fill(null);
-            const days = Array.from({ length: totalDays }, (_, i) => i + 1);
-            const allCells = [...blanks, ...days];
-            const isToday = (day) => {
-                const today = new Date();
-                return day && today.getDate() === day && today.getMonth() === date.getMonth() && today.getFullYear() === date.getFullYear();
-            }
+<!-- 每日详情弹窗 -->
+<div class="overlay" id="dayOverlay">
+  <div class="panel">
+    <h2 id="dayTitle"></h2>
+    <div id="daySubtitle"></div>
+    <div id="dayList"></div>
+    <div class="panel-footer">
+      <button class="btn btn-primary" id="closeDay">OK</button>
+    </div>
+  </div>
+</div>
 
-            return (
-                <div className="max-w-5xl mx-auto md:p-4 min-h-screen flex flex-col">
-                    
-                    {/* 顶部控制栏 */}
-                    <div className="flex flex-col md:flex-row md:justify-between md:items-end mb-4 px-2 pt-2 gap-4">
-                        {/* 左侧：月份切换 */}
-                        <div className="flex justify-between md:justify-start items-center w-full md:w-auto">
-                            <div className="flex items-center text-red-600 font-bold text-4xl gap-4">
-                                <button onClick={() => changeMonth(-1)} className="hover:bg-gray-100 p-2 rounded-full active:scale-90 transition">
-                                    <i className="fa-solid fa-chevron-left text-2xl"></i>
-                                </button>
-                                <span>{date.getMonth() + 1}<span className="text-lg text-gray-500 ml-1">月</span></span>
-                                <button onClick={() => changeMonth(1)} className="hover:bg-gray-100 p-2 rounded-full active:scale-90 transition">
-                                    <i className="fa-solid fa-chevron-right text-2xl"></i>
-                                </button>
-                            </div>
-                            
-                            {/* 手机端的年份显示在右侧 */}
-                            <div className="md:hidden text-xl font-bold text-gray-500">
-                                {date.getFullYear()}年
-                            </div>
-                        </div>
+<script>
+  // ====== 设置相关 ======
+  const STORAGE_KEY = "gomi-settings-v1";
 
-                        {/* 右侧：年份(桌面) 和 设置按钮 */}
-                        <div className="flex items-center justify-end gap-4 md:gap-6 w-full md:w-auto">
-                            {/* 桌面端年份 */}
-                            <div className="hidden md:flex items-center text-4xl font-bold text-black">
-                                <button onClick={() => changeMonth(-12)} className="hover:text-gray-600"><i className="fa-solid fa-caret-left mx-2 text-2xl"></i></button>
-                                {date.getFullYear()}年
-                                <button onClick={() => changeMonth(12)} className="hover:text-gray-600"><i className="fa-solid fa-caret-right mx-2 text-2xl"></i></button>
-                            </div>
-                            
-                            {/* 设置按钮 */}
-                            <button 
-                                onClick={() => setView('settings')}
-                                className="text-black border-2 border-black px-4 py-1.5 rounded-lg font-bold hover:bg-black hover:text-white transition-all flex items-center gap-2 shadow-sm active:shadow-inner"
-                            >
-                                <i className="fa-solid fa-gear"></i> 設置
-                            </button>
-                        </div>
-                    </div>
+  const defaultSettings = {
+    burnable:    { mode: "weekly", weekdays: [3, 6], nth: [] },      // 燃やすごみ　毎週 水・土
+    nonburnable: { mode: "nth",    weekdays: [1],    nth: [1, 3] },  // 燃やさないごみ　1・3 月
+    plastic:     { mode: "weekly", weekdays: [2],    nth: [] },      // プラスチック　毎週 火
+    paper:       { mode: "nth",    weekdays: [2],    nth: [2, 4] },  // 古紙・びん・缶　第2・第4 火
+    pet:         { mode: "weekly", weekdays: [5],    nth: [] },      // ペットボトル　毎週 金
+    tray:        { mode: "weekly", weekdays: [5],    nth: [] },      // 発泡トレイ　毎週 金
+    cloth:       { mode: "weekly", weekdays: [5],    nth: [] }       // 古布　毎週 金
+  };
 
-                    {/* 日历网格 */}
-                    <div className="calendar-grid bg-white shadow-sm md:shadow-lg">
-                        {/* 星期头 */}
-                        <div className="grid grid-cols-7 text-center font-bold text-sm md:text-lg bg-gray-50 md:bg-white">
-                            {WEEKDAYS.map((d, i) => (
-                                <div key={i} className={`calendar-header py-2 md:py-3 ${i === 0 || i === 6 ? 'text-blue-600' : 'text-gray-600'} ${i === 0 ? '!text-red-600' : ''}`}>
-                                    {d}
-                                </div>
-                            ))}
-                        </div>
+  function loadSettings() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        return { ...defaultSettings, ...parsed };
+      }
+    } catch (e) {
+      console.warn("failed to load settings", e);
+    }
+    return { ...defaultSettings };
+  }
 
-                        {/* 日期格子 */}
-                        <div className="grid grid-cols-7">
-                            {allCells.map((day, index) => {
-                                if (!day) return <div key={`blank-${index}`} className="calendar-cell bg-gray-50/50 border-r border-black last:border-r-0 border-b md:border-b-0"></div>;
-                                
-                                const garbageList = getGarbageForDay(day);
-                                const isSunday = index % 7 === 0;
-                                const isSaturday = index % 7 === 6;
-                                const isTodayCell = isToday(day);
+  let settings = loadSettings();
 
-                                return (
-                                    <div 
-                                        key={day} 
-                                        onClick={() => handleDayClick(day, garbageList, index % 7)}
-                                        className={`calendar-cell border-r border-black last:border-r-0 border-b md:border-b-0 p-1 relative flex flex-col hover:bg-yellow-50 active:bg-yellow-100 ${isTodayCell ? 'bg-yellow-50 ring-inset ring-2 ring-yellow-400' : 'bg-white'}`}
-                                    >
-                                        <div className={`font-bold text-lg md:text-xl text-center mb-1 leading-none mt-1 ${isSunday ? 'text-red-600' : (isSaturday ? 'text-blue-600' : 'text-gray-800')}`}>
-                                            {day}
-                                        </div>
-                                        
-                                        {/* 手机端：显示小圆点 */}
-                                        <div className="md:hidden flex flex-wrap justify-center gap-1 mt-1 content-center h-full pb-2">
-                                            {garbageList.slice(0, 4).map((g, idx) => (
-                                                <div key={idx} className="w-2 h-2 rounded-full" style={{backgroundColor: g.colorCode}}></div>
-                                            ))}
-                                            {garbageList.length > 4 && <div className="w-2 h-2 rounded-full bg-gray-300"></div>}
-                                        </div>
+  function saveSettingsToStorage() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    } catch (e) {
+      console.warn("failed to save settings", e);
+    }
+  }
 
-                                        {/* 桌面端：显示文字标签 */}
-                                        <div className="hidden md:flex flex-col gap-1 w-full mt-1">
-                                            {garbageList.map((g, idx) => (
-                                                <div key={`${day}-${g.id}-${idx}`} className={`text-xs px-1 py-0.5 rounded text-center font-bold truncate leading-tight ${g.style}`}>
-                                                    {g.name}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
+  // ====== 垃圾类型定义 ======
+  const garbageTypes = [
+    { id: "burnable",    label: "燃やすごみ",       css: "label-burnable" },
+    { id: "nonburnable", label: "燃やさないごみ",   css: "label-nonburnable" },
+    { id: "plastic",     label: "プラスチック",     css: "label-plastic" },
+    { id: "paper",       label: "古紙・びん・缶",   css: "label-paper" },
+    { id: "pet",         label: "ペットボトル",     css: "label-pet" },
+    { id: "tray",        label: "発泡スチロール製食品用トレイ", css: "label-tray" },
+    { id: "cloth",       label: "古布",             css: "label-cloth" }
+  ];
 
-                    {/* 弹窗 (Modal) */}
-                    {selectedDayInfo && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={closeModal}>
-                            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden modal-enter" onClick={e => e.stopPropagation()}>
-                                {/* 弹窗头部 */}
-                                <div className="bg-gray-900 text-white p-6 relative">
-                                    <button onClick={closeModal} className="absolute top-4 right-4 text-gray-400 hover:text-white">
-                                        <i className="fa-solid fa-xmark text-xl"></i>
-                                    </button>
-                                    <div className="text-sm opacity-80">{date.getFullYear()}年 {date.getMonth() + 1}月</div>
-                                    <div className="flex items-baseline gap-2 mt-1">
-                                        <span className="text-5xl font-bold">{selectedDayInfo.day}</span>
-                                        <span className="text-xl font-bold">({selectedDayInfo.weekDay})</span>
-                                    </div>
-                                </div>
-                                
-                                {/* 弹窗内容 */}
-                                <div className="p-6">
-                                    {selectedDayInfo.garbageList.length > 0 ? (
-                                        <>
-                                            <h3 className="text-gray-500 text-sm font-bold mb-3 uppercase tracking-wider">今日のゴミ</h3>
-                                            <div className="space-y-3">
-                                                {selectedDayInfo.garbageList.map((g, i) => (
-                                                    <div key={i} className="flex items-center p-3 rounded-xl border border-gray-100 bg-gray-50">
-                                                        <div className={`w-4 h-4 rounded-full mr-3 ${g.style.replace('text-', 'bg-').split(' ')[0]} shadow-sm`}></div>
-                                                        <span className="text-lg font-bold text-gray-800">{g.name}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </>
-                                    ) : (
-                                        <div className="text-center py-8 text-gray-400">
-                                            <i className="fa-regular fa-calendar-check text-4xl mb-3"></i>
-                                            <p>今日は回収がありません</p>
-                                        </div>
-                                    )}
-                                </div>
-                                
-                                <div className="p-4 border-t bg-gray-50 text-center">
-                                    <button onClick={closeModal} className="text-blue-600 font-bold text-sm">閉じる</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            );
+  // ====== 今天（用于 Today 高亮） ======
+  const today = new Date();
+  const TODAY_YEAR  = today.getFullYear();
+  const TODAY_MONTH = today.getMonth();   // 0-11
+  const TODAY_DATE  = today.getDate();
+
+  // ====== 收集日判断 ======
+  function isCollectionDay(date, rule) {
+    if (!rule || rule.mode === "off") return false;
+
+    const weekday = date.getDay();
+    if (!rule.weekdays || rule.weekdays.length === 0) return false;
+    if (!rule.weekdays.includes(weekday)) return false;
+
+    if (rule.mode === "weekly") return true;
+
+    if (rule.mode === "nth") {
+      const nth = Math.floor((date.getDate() - 1) / 7) + 1;
+      if (!rule.nth || rule.nth.length === 0) return false;
+      return rule.nth.includes(nth);
+    }
+    return false;
+  }
+
+  function getGarbageForDate(date) {
+    const list = [];
+    for (const g of garbageTypes) {
+      const rule = settings[g.id];
+      if (isCollectionDay(date, rule)) {
+        list.push({ ...g });
+      }
+    }
+    return list;
+  }
+
+  // ====== 日历 ======
+  let current = new Date(); // 打开时默认当月
+
+  const calendarBody = document.getElementById("calendarBody");
+  const monthLabel = document.getElementById("monthLabel");
+
+  function renderCalendar() {
+    const year = current.getFullYear();
+    const month = current.getMonth();
+
+    monthLabel.textContent = `${year}年${month + 1}月`;
+
+    calendarBody.innerHTML = "";
+
+    const firstDay = new Date(year, month, 1);
+    const lastDay  = new Date(year, month + 1, 0);
+    const startWeekday = firstDay.getDay();
+    const totalDays    = lastDay.getDate();
+
+    let row = document.createElement("tr");
+    let colIndex = 0;
+
+    // 前置空格
+    for (let i = 0; i < startWeekday; i++) {
+      const td = document.createElement("td");
+      if (colIndex === 0) td.classList.add("sun");
+      if (colIndex === 6) td.classList.add("sat");
+      row.appendChild(td);
+      colIndex++;
+    }
+
+    for (let day = 1; day <= totalDays; day++) {
+      if (colIndex === 7) {
+        calendarBody.appendChild(row);
+        row = document.createElement("tr");
+        colIndex = 0;
+      }
+
+      const td = document.createElement("td");
+      if (colIndex === 0) td.classList.add("sun");
+      if (colIndex === 6) td.classList.add("sat");
+
+      const date = new Date(year, month, day);
+
+      // Today 高亮
+      if (
+        year  === TODAY_YEAR &&
+        month === TODAY_MONTH &&
+        day   === TODAY_DATE
+      ) {
+        td.classList.add("today");
+      }
+
+      const num = document.createElement("div");
+      num.className = "date-number";
+      num.textContent = day;
+      td.appendChild(num);
+
+      const labelsWrapper = document.createElement("div");
+      labelsWrapper.className = "labels";
+
+      const gomiList = getGarbageForDate(date);
+      gomiList.forEach(g => {
+        const div = document.createElement("div");
+        div.className = "label " + g.css;
+        div.textContent = g.label;
+        labelsWrapper.appendChild(div);
+      });
+
+      if (gomiList.length > 0) {
+        td.appendChild(labelsWrapper);
+      }
+
+      // 点击某一天 -> 弹出详情
+      td.addEventListener("click", () => {
+        openDayModal(date, gomiList);
+      });
+
+      row.appendChild(td);
+      colIndex++;
+    }
+
+    // 收尾补齐
+    while (colIndex > 0 && colIndex < 7) {
+      const td = document.createElement("td");
+      if (colIndex === 0) td.classList.add("sun");
+      if (colIndex === 6) td.classList.add("sat");
+      row.appendChild(td);
+      colIndex++;
+    }
+    calendarBody.appendChild(row);
+  }
+
+  // 月份切换
+  document.getElementById("prevMonth").addEventListener("click", () => {
+    current.setMonth(current.getMonth() - 1);
+    renderCalendar();
+  });
+  document.getElementById("nextMonth").addEventListener("click", () => {
+    current.setMonth(current.getMonth() + 1);
+    renderCalendar();
+  });
+
+  // ====== 设置弹窗逻辑 ======
+  const settingsOverlay = document.getElementById("settingsOverlay");
+  document.getElementById("openSettings").addEventListener("click", () => {
+    populateSettingsForm();
+    settingsOverlay.style.display = "flex";
+  });
+  document.getElementById("closeSettings").addEventListener("click", () => {
+    settingsOverlay.style.display = "none";
+  });
+  settingsOverlay.addEventListener("click", e => {
+    if (e.target === settingsOverlay) settingsOverlay.style.display = "none";
+  });
+
+  function populateSettingsForm() {
+    const rows = document.querySelectorAll("#settingsTable tbody tr");
+    rows.forEach(row => {
+      const id = row.dataset.id;
+      const rule = settings[id];
+      if (!rule) return;
+
+      row.querySelector(".mode").value = rule.mode;
+
+      const weekdayChecks = row.querySelectorAll(".weekday-group input[type=checkbox]");
+      weekdayChecks.forEach(cb => {
+        cb.checked = rule.weekdays.includes(Number(cb.value));
+      });
+
+      const nthChecks = row.querySelectorAll(".nth-group input[type=checkbox]");
+      nthChecks.forEach(cb => {
+        cb.checked = rule.nth.includes(Number(cb.value));
+      });
+    });
+  }
+
+  document.getElementById("saveSettings").addEventListener("click", () => {
+    const rows = document.querySelectorAll("#settingsTable tbody tr");
+    rows.forEach(row => {
+      const id = row.dataset.id;
+      const mode = row.querySelector(".mode").value;
+
+      const weekdays = [];
+      row.querySelectorAll(".weekday-group input[type=checkbox]:checked")
+        .forEach(cb => weekdays.push(Number(cb.value)));
+
+      const nth = [];
+      row.querySelectorAll(".nth-group input[type=checkbox]:checked")
+        .forEach(cb => nth.push(Number(cb.value)));
+
+      settings[id] = { mode, weekdays, nth };
+    });
+
+    saveSettingsToStorage();
+    settingsOverlay.style.display = "none";
+    renderCalendar();
+  });
+
+  // ====== 每日详情弹窗 ======
+  const dayOverlay  = document.getElementById("dayOverlay");
+  const dayTitle    = document.getElementById("dayTitle");
+  const daySubtitle = document.getElementById("daySubtitle");
+  const dayList     = document.getElementById("dayList");
+  const closeDay    = document.getElementById("closeDay");
+
+  function openDayModal(date, gomiList) {
+    const y = date.getFullYear();
+    const m = date.getMonth() + 1;
+    const d = date.getDate();
+    const weekdayNames = ["日", "月", "火", "水", "木", "金", "土"];
+
+    dayTitle.textContent = `${y}年${m}月${d}日（${weekdayNames[date.getDay()]}）`;
+
+    const nth = Math.floor((d - 1) / 7) + 1;
+    daySubtitle.textContent = `第${nth}週目`;
+
+    dayList.innerHTML = "";
+
+    if (!gomiList || gomiList.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "day-empty";
+      empty.textContent = "この日は収集予定はありません。";
+      dayList.appendChild(empty);
+    } else {
+      gomiList.forEach(g => {
+        const item = document.createElement("div");
+        item.className = "day-item";
+
+        const left = document.createElement("div");
+        left.className = "day-item-label";
+        left.textContent = g.label;
+
+        const tag = document.createElement("span");
+        tag.className = "day-item-tag";
+        tag.textContent = "ごみ出し日";
+
+        item.appendChild(left);
+        item.appendChild(tag);
+
+        item.style.borderLeft = "4px solid";
+        switch (g.id) {
+          case "burnable":    item.style.borderLeftColor = "#f97373"; break;
+          case "nonburnable": item.style.borderLeftColor = "#facc15"; break;
+          case "plastic":     item.style.borderLeftColor = "#60a5fa"; break;
+          case "paper":       item.style.borderLeftColor = "#eab308"; break;
+          case "pet":         item.style.borderLeftColor = "#22c55e"; break;
+          case "tray":        item.style.borderLeftColor = "#4f46e5"; break;
+          case "cloth":       item.style.borderLeftColor = "#d946ef"; break;
         }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
+        dayList.appendChild(item);
+      });
+    }
+
+    dayOverlay.style.display = "flex";
+  }
+
+  closeDay.addEventListener("click", () => {
+    dayOverlay.style.display = "none";
+  });
+  dayOverlay.addEventListener("click", e => {
+    if (e.target === dayOverlay) dayOverlay.style.display = "none";
+  });
+
+  // ====== 初始渲染（默认今天所在的月份） ======
+  renderCalendar();
+</script>
 </body>
 </html>
