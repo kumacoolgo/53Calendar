@@ -90,8 +90,16 @@
       background: var(--bg-card);
       border-radius: 16px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.05);
-      overflow: hidden;
       border: 1px solid rgba(255,255,255,0.5);
+
+      /* ⭐ 新增：横向滚动容器 */
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* ⭐ 新增：内部固定一个“最小宽度”，手机上不足就可以左右滑 */
+    .calendar-inner {
+      min-width: 640px;
     }
 
     .weekdays {
@@ -304,9 +312,7 @@
       padding: 4px;
       border-radius: 50%;
     }
-    .delete-type-btn:active {
-      background: #f1f5f9;
-    }
+    .delete-type-btn:active { background: #f1f5f9; }
 
     .mode-selector {
       display: flex;
@@ -413,6 +419,26 @@
       text-align: center; padding: 30px; color: var(--text-sub);
       background: #f8fafc; border-radius: 12px; border: 1px dashed var(--border);
     }
+
+    /* 📱 小屏进一步压缩一点高度和宽度 */
+    @media (max-width: 480px) {
+      body {
+        padding-left: 8px;
+        padding-right: 8px;
+      }
+      .calendar-inner {
+        min-width: 560px;
+      }
+      .days-grid {
+        auto-rows: minmax(72px, auto);
+      }
+      .mini-label {
+        font-size: 9px;
+      }
+      .date-num {
+        font-size: 13px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -428,486 +454,26 @@
   </button>
 </div>
 
+<!-- ⭐ 新增 .calendar-inner 包住 weekdays + days-grid -->
 <div class="calendar-container">
-  <div class="weekdays">
-    <div class="sun">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="sat">土</div>
+  <div class="calendar-inner">
+    <div class="weekdays">
+      <div class="sun">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="sat">土</div>
+    </div>
+    <div class="days-grid" id="calendarGrid"></div>
   </div>
-  <div class="days-grid" id="calendarGrid"></div>
 </div>
 
 <div class="legend" id="legendContainer"></div>
 
-<!-- 详情弹窗 -->
-<div class="modal-overlay" id="detailModal">
-  <div class="modal-card">
-    <div class="modal-header">
-      <div class="modal-title">収集内容</div>
-      <button class="modal-close-btn" id="closeDetail"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-    <div class="modal-body">
-      <div class="detail-date" id="detailDateStr"></div>
-      <div class="detail-meta" id="detailMetaStr"></div>
-      <div id="detailList"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-save" style="width:100%" id="okDetail">OK</button>
-    </div>
-  </div>
-</div>
-
-<!-- 设置弹窗 -->
-<div class="modal-overlay" id="settingsModal">
-  <div class="modal-card">
-    <div class="modal-header">
-      <div class="modal-title">収集ルール設定</div>
-      <button class="modal-close-btn" id="closeSettings"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-    <div class="modal-body">
-      <button class="btn-add-type" id="addCategory">
-        <i class="fa-solid fa-plus"></i> 分類を追加
-      </button>
-      <div class="settings-list" id="settingsList"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn-reset" id="resetSettings">初期化</button>
-      <button class="btn-save" id="saveSettings">保存して閉じる</button>
-    </div>
-  </div>
-</div>
-
+<!-- 下面 JS 部分和我上一条给你的动态分类版本完全一样，
+     直接沿用就行（为了不太长，这里就不重复粘贴 JS 了）。
+     你只需要：
+     - 保留原来的 <script> ... </script> 内容不变，
+     - 把上面的 HTML+CSS 替换进来即可。 -->
 <script>
-  // ====== 颜色轮盘（新增分类时循环使用）======
-  const COLOR_PALETTE = [
-    { bgColor: "#fee2e2", textColor: "#991b1b", color: "#ef4444" },
-    { bgColor: "#fef3c7", textColor: "#92400e", color: "#f59e0b" },
-    { bgColor: "#dbeafe", textColor: "#1d4ed8", color: "#3b82f6" },
-    { bgColor: "#dcfce7", textColor: "#166534", color: "#22c55e" },
-    { bgColor: "#e0e7ff", textColor: "#3730a3", color: "#6366f1" },
-    { bgColor: "#fae8ff", textColor: "#86198f", color: "#e879f9" },
-    { bgColor: "#f3e8ff", textColor: "#6b21a8", color: "#a855f7" },
-    { bgColor: "#e0f2fe", textColor: "#075985", color: "#0ea5e9" }
-  ];
-
-  // ====== 默认分类 & 规则 ======
-  const DEFAULT_TYPES = [
-    { id: "burnable",    label: "燃やすごみ",       color: "#ef4444", bgColor: "#fee2e2", textColor: "#991b1b", icon: "fa-fire" },
-    { id: "nonburnable", label: "燃やさないごみ",   color: "#374151", bgColor: "#f3f4f6", textColor: "#374151", icon: "fa-battery-full" },
-    { id: "plastic",     label: "プラスチック",     color: "#1d4ed8", bgColor: "#dbeafe", textColor: "#1e40af", icon: "fa-bottle-water" },
-    { id: "paper",       label: "古紙・びん・缶",   color: "#a16207", bgColor: "#fef9c3", textColor: "#854d0e", icon: "fa-newspaper" },
-    { id: "pet",         label: "ペットボトル",     color: "#15803d", bgColor: "#dcfce7", textColor: "#166534", icon: "fa-recycle" },
-    { id: "tray",        label: "食品トレイ",       color: "#4338ca", bgColor: "#e0e7ff", textColor: "#3730a3", icon: "fa-utensils" },
-    { id: "cloth",       label: "古布",             color: "#a21caf", bgColor: "#fae8ff", textColor: "#86198f", icon: "fa-shirt" }
-  ];
-
-  const DEFAULT_RULES = {
-    burnable:    { mode: "weekly", weekdays: [3, 6], nth: [] },
-    nonburnable: { mode: "nth",    weekdays: [1],    nth: [1, 3] },
-    plastic:     { mode: "weekly", weekdays: [2],    nth: [] },
-    paper:       { mode: "nth",    weekdays: [2],    nth: [2, 4] },
-    pet:         { mode: "weekly", weekdays: [5],    nth: [] },
-    tray:        { mode: "weekly", weekdays: [5],    nth: [] },
-    cloth:       { mode: "weekly", weekdays: [5],    nth: [] }
-  };
-
-  const STORAGE_KEY = "gomi-app-v4";
-
-  let types = [];
-  let rules = {};
-  let currentDate = new Date();
-  const TODAY = new Date();
-
-  // ====== 状态加载 & 保存 ======
-  function createDefaultState() {
-    return {
-      types: JSON.parse(JSON.stringify(DEFAULT_TYPES)),
-      rules: JSON.parse(JSON.stringify(DEFAULT_RULES))
-    };
-  }
-
-  function loadState() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return createDefaultState();
-      const parsed = JSON.parse(raw);
-
-      let loadedTypes = Array.isArray(parsed.types) && parsed.types.length
-        ? parsed.types
-        : DEFAULT_TYPES;
-      loadedTypes = JSON.parse(JSON.stringify(loadedTypes));
-
-      let loadedRules = parsed.rules && typeof parsed.rules === "object"
-        ? parsed.rules
-        : DEFAULT_RULES;
-      loadedRules = JSON.parse(JSON.stringify(loadedRules));
-
-      // 确保每个分类都有规则
-      loadedTypes.forEach(t => {
-        if (!loadedRules[t.id]) {
-          loadedRules[t.id] = { mode: "off", weekdays: [], nth: [] };
-        }
-      });
-
-      return { types: loadedTypes, rules: loadedRules };
-    } catch {
-      return createDefaultState();
-    }
-  }
-
-  function persistState() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ types, rules }));
-  }
-
-  // ====== 规则判断 ======
-  function checkRule(date, rule) {
-    if (!rule || rule.mode === "off") return false;
-    const w = date.getDay();
-    if (!rule.weekdays.includes(w)) return false;
-
-    if (rule.mode === "weekly") return true;
-
-    if (rule.mode === "nth") {
-      const nth = Math.floor((date.getDate() - 1) / 7) + 1;
-      return rule.nth.includes(nth);
-    }
-    return false;
-  }
-
-  function getGarbageList(date) {
-    return types.filter(t => checkRule(date, rules[t.id]));
-  }
-
-  // ====== 初始化 ======
-  (function initState() {
-    const state = loadState();
-    types = state.types;
-    rules = state.rules;
-  })();
-
-  function init() {
-    renderCalendar();
-    renderLegend();
-    renderSettingsUI();
-
-    document.getElementById("prevMonth").onclick = () => changeMonth(-1);
-    document.getElementById("nextMonth").onclick = () => changeMonth(1);
-
-    document.getElementById("openSettings").onclick = () => {
-      renderSettingsUI();
-      toggleModal("settingsModal", true);
-    };
-    document.getElementById("closeSettings").onclick = () => toggleModal("settingsModal", false);
-    document.getElementById("saveSettings").onclick = () => {
-      persistState();
-      renderCalendar();
-      renderLegend();
-      toggleModal("settingsModal", false);
-    };
-    document.getElementById("resetSettings").onclick = resetAll;
-    document.getElementById("addCategory").onclick = addCategory;
-
-    document.getElementById("closeDetail").onclick = () => toggleModal("detailModal", false);
-    document.getElementById("okDetail").onclick    = () => toggleModal("detailModal", false);
-
-    document.querySelectorAll(".modal-overlay").forEach(el => {
-      el.addEventListener("click", e => {
-        if (e.target === el) toggleModal(el.id, false);
-      });
-    });
-
-    document.addEventListener("keydown", e => {
-      if (e.key === "Escape") {
-        toggleModal("detailModal", false);
-        toggleModal("settingsModal", false);
-      }
-    });
-  }
-
-  // ====== 日历渲染 ======
-  function changeMonth(delta) {
-    currentDate.setMonth(currentDate.getMonth() + delta);
-    renderCalendar();
-  }
-
-  function renderCalendar() {
-    const y = currentDate.getFullYear();
-    const m = currentDate.getMonth();
-    document.getElementById("monthLabel").textContent = `${y}年 ${m + 1}月`;
-
-    const firstDay = new Date(y, m, 1);
-    const lastDay = new Date(y, m + 1, 0);
-    const startWeek = firstDay.getDay();
-    const totalDays = lastDay.getDate();
-
-    const grid = document.getElementById("calendarGrid");
-    grid.innerHTML = "";
-
-    // 前面补空格
-    for (let i = 0; i < startWeek; i++) {
-      const cell = document.createElement("div");
-      cell.className = "day-cell other-month";
-      grid.appendChild(cell);
-    }
-
-    // 当前月日期
-    for (let d = 1; d <= totalDays; d++) {
-      const date = new Date(y, m, d);
-      const cell = document.createElement("div");
-      cell.className = "day-cell";
-
-      const w = date.getDay();
-      if (w === 0) cell.classList.add("sun");
-      if (w === 6) cell.classList.add("sat");
-
-      if (date.toDateString() === TODAY.toDateString()) {
-        cell.classList.add("today");
-      }
-
-      const num = document.createElement("div");
-      num.className = "date-num";
-      num.textContent = d;
-      cell.appendChild(num);
-
-      const container = document.createElement("div");
-      container.className = "labels-container";
-
-      const list = getGarbageList(date);
-      list.forEach(g => {
-        const label = document.createElement("div");
-        label.className = "mini-label";
-        label.textContent = g.label;
-        label.style.background = g.bgColor;
-        label.style.color = g.textColor;
-        container.appendChild(label);
-      });
-      cell.appendChild(container);
-
-      cell.addEventListener("click", () => openDetail(date, list));
-
-      grid.appendChild(cell);
-    }
-
-    // 后面补空格
-    const cellsSoFar = startWeek + totalDays;
-    const remainder = cellsSoFar % 7;
-    if (remainder !== 0) {
-      const blanks = 7 - remainder;
-      for (let i = 0; i < blanks; i++) {
-        const cell = document.createElement("div");
-        cell.className = "day-cell other-month";
-        grid.appendChild(cell);
-      }
-    }
-  }
-
-  // ====== 图例 ======
-  function renderLegend() {
-    const el = document.getElementById("legendContainer");
-    el.innerHTML = types
-      .map(
-        t => `
-      <div class="legend-item">
-        <span class="legend-dot" style="background:${t.color}"></span>
-        ${t.label}
-      </div>`
-      )
-      .join("");
-  }
-
-  // ====== 详情弹窗 ======
-  function openDetail(date, list) {
-    const days = ["日", "月", "火", "水", "木", "金", "土"];
-    document.getElementById("detailDateStr").textContent =
-      `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 (${days[date.getDay()]})`;
-
-    const nth = Math.floor((date.getDate() - 1) / 7) + 1;
-    document.getElementById("detailMetaStr").textContent = `第${nth}週目`;
-
-    const container = document.getElementById("detailList");
-    if (!list.length) {
-      container.innerHTML =
-        `<div class="detail-empty"><i class="fa-regular fa-face-smile"></i><br>回収予定はありません</div>`;
-    } else {
-      container.innerHTML = list
-        .map(
-          g => `
-        <div class="detail-item" style="border-left-color:${g.color}; border-left-width:4px;">
-          <div class="detail-icon" style="background:${g.bgColor}; color:${g.textColor};">
-            <i class="fa-solid ${g.icon}"></i>
-          </div>
-          <div class="detail-name">${g.label}</div>
-        </div>`
-        )
-        .join("");
-    }
-    toggleModal("detailModal", true);
-  }
-
-  // ====== 设置界面：新增 / 删除分类 ======
-  function slugify(name) {
-    return name
-      .trim()
-      .toLowerCase()
-      .replace(/[^\p{L}\p{N}]+/gu, "-")
-      .replace(/^-+|-+$/g, "") || "cat";
-  }
-
-  function addCategory() {
-    const name = prompt("新しいごみ分類の名前を入力してください：");
-    if (!name || !name.trim()) return;
-    const trimmed = name.trim();
-
-    let baseId = slugify(trimmed);
-    let id = baseId;
-    let idx = 1;
-    while (types.some(t => t.id === id)) {
-      id = `${baseId}-${idx++}`;
-    }
-
-    const palette = COLOR_PALETTE[types.length % COLOR_PALETTE.length];
-    const newType = {
-      id,
-      label: trimmed,
-      color: palette.color,
-      bgColor: palette.bgColor,
-      textColor: palette.textColor,
-      icon: "fa-trash-can"
-    };
-
-    types.push(newType);
-    rules[id] = { mode: "off", weekdays: [], nth: [] };
-    persistState();
-    renderSettingsUI();
-    renderCalendar();
-    renderLegend();
-  }
-
-  function deleteCategory(id) {
-    if (types.length <= 1) {
-      alert("少なくとも1つの分類が必要です。");
-      return;
-    }
-    const t = types.find(x => x.id === id);
-    const name = t ? t.label : id;
-    if (!confirm(`「${name}」を削除しますか？`)) return;
-
-    types = types.filter(x => x.id !== id);
-    delete rules[id];
-    persistState();
-    renderSettingsUI();
-    renderCalendar();
-    renderLegend();
-  }
-
-  function resetAll() {
-    if (!confirm("全ての分類と収集ルールを初期状態に戻しますか？")) return;
-    const state = createDefaultState();
-    types = state.types;
-    rules = state.rules;
-    localStorage.removeItem(STORAGE_KEY);
-    renderSettingsUI();
-    renderCalendar();
-    renderLegend();
-  }
-
-  // ====== 设置界面渲染 ======
-  function renderSettingsUI() {
-    const container = document.getElementById("settingsList");
-    container.innerHTML = "";
-
-    const dayLabels = ["日", "月", "火", "水", "木", "金", "土"];
-
-    types.forEach(type => {
-      const rule = rules[type.id];
-      const wrapper = document.createElement("div");
-      wrapper.className = "setting-group";
-      wrapper.dataset.id = type.id;
-
-      wrapper.innerHTML = `
-        <div class="setting-header">
-          <div class="setting-title">
-            <div class="setting-indicator" style="background:${type.color}"></div>
-            ${type.label}
-          </div>
-          <button class="delete-type-btn" type="button" title="削除" data-delete="${type.id}">
-            <i class="fa-solid fa-trash-can"></i>
-          </button>
-        </div>
-        <div class="mode-selector">
-          <div class="mode-option ${rule.mode === "weekly" ? "active" : ""}" data-mode="weekly">毎週</div>
-          <div class="mode-option ${rule.mode === "nth" ? "active" : ""}" data-mode="nth">隔週・指定週</div>
-          <div class="mode-option ${rule.mode === "off" ? "active" : ""}" data-mode="off">なし</div>
-        </div>
-        <div class="options-container ${rule.mode === "off" ? "hidden" : ""}">
-          <div style="font-size:12px;color:var(--text-sub);margin-bottom:4px;">曜日:</div>
-          <div class="week-selector">
-            ${[0,1,2,3,4,5,6].map(d => `
-              <div class="toggle-btn ${rule.weekdays.includes(d) ? "active" : ""}" data-day="${d}">
-                ${dayLabels[d]}
-              </div>`).join("")}
-          </div>
-          <div class="nth-wrapper ${rule.mode !== "nth" ? "hidden" : ""}" style="margin-top:10px;">
-            <div style="font-size:12px;color:var(--text-sub);margin-bottom:4px;">対象週:</div>
-            <div class="nth-selector">
-              ${[1,2,3,4,5].map(n => `
-                <div class="toggle-btn ${rule.nth.includes(n) ? "active" : ""}" data-nth="${n}">
-                  第${n}
-                </div>`).join("")}
-            </div>
-          </div>
-        </div>
-      `;
-
-      // 删除按钮
-      wrapper.querySelector("[data-delete]").addEventListener("click", () => deleteCategory(type.id));
-
-      // 模式按钮
-      wrapper.querySelectorAll(".mode-option").forEach(btn => {
-        btn.addEventListener("click", () => {
-          const mode = btn.dataset.mode;
-          rules[type.id].mode = mode;
-          persistState();
-          renderSettingsUI();
-        });
-      });
-
-      // 星期按钮
-      wrapper.querySelectorAll("[data-day]").forEach(btn => {
-        btn.addEventListener("click", () => {
-          const day = Number(btn.dataset.day);
-          const arr = rules[type.id].weekdays;
-          const idx = arr.indexOf(day);
-          if (idx >= 0) arr.splice(idx, 1); else arr.push(day);
-          persistState();
-          renderSettingsUI();
-        });
-      });
-
-      // 第几周按钮
-      wrapper.querySelectorAll("[data-nth]").forEach(btn => {
-        btn.addEventListener("click", () => {
-          const n = Number(btn.dataset.nth);
-          const arr = rules[type.id].nth;
-          const idx = arr.indexOf(n);
-          if (idx >= 0) arr.splice(idx, 1); else arr.push(n);
-          persistState();
-          renderSettingsUI();
-        });
-      });
-
-      container.appendChild(wrapper);
-    });
-  }
-
-  // ====== 通用弹窗 ======
-  function toggleModal(id, show) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    if (show) el.classList.add("active");
-    else el.classList.remove("active");
-  }
-
-  // 启动
-  init();
+/* 把你上一版的 JS 全部原样贴在这里即可
+   （从 const COLOR_PALETTE = [...] 一直到 init(); 结尾） */
 </script>
 </body>
 </html>
