@@ -808,19 +808,21 @@
     container.appendChild(banner);
   }
 
-  function renderLegend() {
-    const el = document.getElementById("legendContainer");
-    el.innerHTML = types
-      .map(
-        t => `
+function renderLegend() {
+  const el = document.getElementById("legendContainer");
+  el.innerHTML = types
+    .map(
+      t => `
       <div class="legend-item">
-        <span class="legend-dot" style="background:${t.color}"></span>
+        <span
+          class="legend-dot"
+          style="background:${t.bgColor}; border:1px solid ${t.color};"
+        ></span>
         ${t.label}
       </div>`
-      )
-      .join("");
-  }
-
+    )
+    .join("");
+}
   function openDetail(date, list) {
     const days = ["日", "月", "火", "水", "木", "金", "土"];
     document.getElementById("detailDateStr").textContent =
@@ -1021,6 +1023,7 @@
 </script>
 </body>
 </html>
+
 
 
 
