@@ -85,20 +85,20 @@
     }
 
     .btn-settings {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: var(--text-main);
-  color: white;
-  border: none;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;      /* 图标稍微大一点 */
-}
-.btn-settings:active { transform: scale(0.96); }
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--text-main);
+      color: white;
+      border: none;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+    .btn-settings:active { transform: scale(0.96); }
 
     /* === 明日提醒横幅 === */
     .tomorrow-banner {
@@ -203,9 +203,27 @@
       font-weight: 600;
       margin-bottom: 4px;
       color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
     }
     .day-cell.sun .date-num { color: #ef4444; }
     .day-cell.sat .date-num { color: #3b82f6; }
+
+    /* 祝日样式：让数字跟星期日一样红，并显示祝日名称 */
+    .day-cell.holiday .date-num {
+      color: #ef4444;
+    }
+    .holiday-name {
+      font-size: 9px;
+      font-weight: 500;
+      margin-top: 2px;
+      color: #ef4444;
+      line-height: 1.1;
+      white-space: nowrap;
+    }
+
     .day-cell.other-month { background: #fcfcfc; opacity: 0.5; pointer-events: none; }
 
     .labels-container {
@@ -576,13 +594,17 @@
   };
 
   const STORAGE_KEY = "gomi-app-v5";
+  const HOLIDAY_CACHE_KEY = "gomi-app-holidays-v1";
 
   let types = [];
   let rules = {};
   let currentDate = new Date();
   let renderTimer = null;
 
-  // 今日（00:00:00）を取得
+  // 祝日数据 { "YYYY-MM-DD": "成人の日", ... }
+  let holidayMap = {};
+
+  // 今日（00:00:00）
   function getToday() {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -653,11 +675,80 @@
     return types.filter(t => checkRule(date, rules[t.id]));
   }
 
+  // 祝日缓存读取
+  function loadHolidayCache() {
+    try {
+      const raw = localStorage.getItem(HOLIDAY_CACHE_KEY);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return {};
+      return parsed;
+    } catch {
+      return {};
+    }
+  }
+
+  // 祝日缓存保存
+  function saveHolidayCache(map) {
+    try {
+      localStorage.setItem(HOLIDAY_CACHE_KEY, JSON.stringify(map));
+    } catch {
+      // ignore
+    }
+  }
+
+  // 获取 YYYY-MM-DD key
+  function dateKey(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  // 判断某天是否祝日
+  function isHoliday(date) {
+    const key = dateKey(date);
+    return holidayMap[key] !== undefined;
+  }
+
+  // 获取祝日名称（如果不是祝日，返回空字符串）
+  function getHolidayName(date) {
+    const key = dateKey(date);
+    return holidayMap[key] || "";
+  }
+
+  // 初始化状态
   (function initState() {
     const state = loadState();
     types = state.types;
     rules = state.rules;
+
+    // 尝试从缓存加载祝日
+    holidayMap = loadHolidayCache();
+    // 也尝试从网络更新一次（不会影响离线使用）
+    fetchHolidaysFromAPI();
   })();
+
+  // 官方祝日 API 拉取（B 方案）
+  async function fetchHolidaysFromAPI() {
+    try {
+      // 日本祝日汇总 API（JSON）
+      const res = await fetch("https://holidays-jp.github.io/api/v1/date.json", {
+        cache: "no-cache"
+      });
+      if (!res.ok) throw new Error("holiday api error");
+      const data = await res.json();
+      // 直接就是 { "YYYY-MM-DD": "敬老の日", ... }
+      if (data && typeof data === "object") {
+        holidayMap = data;
+        saveHolidayCache(holidayMap);
+        // 重新渲染一次，让祝日变红并显示名称
+        renderCalendar();
+      }
+    } catch (e) {
+      console.warn("祝日 API 取得失敗。キャッシュのみ使用します。", e);
+    }
+  }
 
   function init() {
     renderCalendar();
@@ -743,6 +834,11 @@
       if (w === 0) cell.classList.add("sun");
       if (w === 6) cell.classList.add("sat");
 
+      const holidayName = getHolidayName(date);
+      if (holidayName) {
+        cell.classList.add("holiday");
+      }
+
       if (date.getTime() === todayObj.getTime()) {
         cell.classList.add("today");
       }
@@ -750,6 +846,15 @@
       const num = document.createElement("div");
       num.className = "date-num";
       num.textContent = d;
+
+      // 祝日名称展示（数字下面小字）
+      if (holidayName) {
+        const hName = document.createElement("div");
+        hName.className = "holiday-name";
+        hName.textContent = holidayName;
+        num.appendChild(hName);
+      }
+
       cell.appendChild(num);
 
       const container = document.createElement("div");
@@ -808,11 +913,11 @@
     container.appendChild(banner);
   }
 
-function renderLegend() {
-  const el = document.getElementById("legendContainer");
-  el.innerHTML = types
-    .map(
-      t => `
+  function renderLegend() {
+    const el = document.getElementById("legendContainer");
+    el.innerHTML = types
+      .map(
+        t => `
       <div class="legend-item">
         <span
           class="legend-dot"
@@ -820,16 +925,23 @@ function renderLegend() {
         ></span>
         ${t.label}
       </div>`
-    )
-    .join("");
-}
+      )
+      .join("");
+  }
+
   function openDetail(date, list) {
     const days = ["日", "月", "火", "水", "木", "金", "土"];
     document.getElementById("detailDateStr").textContent =
       `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 (${days[date.getDay()]})`;
 
     const nth = Math.floor((date.getDate() - 1) / 7) + 1;
-    document.getElementById("detailMetaStr").textContent = `第${nth}週目`;
+    const holidayName = getHolidayName(date);
+
+    let metaText = `第${nth}週目`;
+    if (holidayName) {
+      metaText += ` ／ 祝日：${holidayName}`;
+    }
+    document.getElementById("detailMetaStr").textContent = metaText;
 
     const container = document.getElementById("detailList");
     if (!list.length) {
@@ -1023,7 +1135,3 @@ function renderLegend() {
 </script>
 </body>
 </html>
-
-
-
-
