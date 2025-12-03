@@ -685,3 +685,16 @@ body.exporting-pdf #pdfArea {
     background: #020617;
   }
 }
+
+/* === Fix header overflow while keeping calendar scrollable === */
+
+/* Prevent the whole page from horizontal overflow */
+body {
+  overflow-x: hidden;
+}
+
+/* Make header & controls not affected by wide calendar */
+.header, .month-nav, .header-actions {
+  max-width: 100%;
+  overflow-x: hidden;
+}
