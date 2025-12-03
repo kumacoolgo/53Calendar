@@ -649,28 +649,46 @@ body.exporting-pdf #pdfArea {
   }
 }
 
-/* ===== 移动端：标题按钮移动到第二行 ===== */
+/* =========================================
+   📱 手机端：标题分两行 & 按钮统一大小
+   ========================================= */
 @media (max-width: 480px) {
+
+  /* 标题整体改成纵向排列（两行） */
   .header {
-    flex-direction: column;     /* 改为纵向排列 */
+    flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
   }
 
+  /* 第一行：月份切换 & 标题 */
   .month-nav {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .header-actions {
     width: 100%;
     justify-content: center;
     gap: 14px;
   }
 
+  /* 第二行：按钮（今日 / 打印 / 设置） */
+  .header-actions {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    margin-top: 4px;
+  }
+
   .btn-icon,
   .btn-settings {
-    transform: scale(0.9);      /* 稍微缩小一点（可选） */
+    width: 52px !important;
+    height: 52px !important;
+    font-size: 18px;
+  }
+
+  /* 设置按钮背景为白色（与其他统一）*/
+  .btn-settings {
+    background: #ffffff !important;
+    color: var(--text-main) !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
   }
 }
 
