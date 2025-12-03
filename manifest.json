@@ -1,6 +1,6 @@
 {
   "name": "ごみ収集カレンダー",
-  "short_name": "ごみ収集",
+  "short_name": "ごみカレンダー",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f8fafc",
