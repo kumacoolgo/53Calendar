@@ -164,12 +164,14 @@ body {
 }
 
 .calendar-inner {
-  min-width: 900px;           /* 原 600px，桌面更宽一点 */
+  width: 100%;
+  max-width: 900px;           /* 桌面最多 900px，窄屏缩小 */
+  margin: 0 auto;
 }
 
 .weekdays {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   background: #f8fafc;
   border-bottom: 2px solid var(--border);
 }
@@ -192,7 +194,7 @@ body {
 
 .days-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   auto-rows: minmax(120px, auto);   /* 原 85px，更高一点 */
 }
 
@@ -629,7 +631,8 @@ body.exporting-pdf #pdfArea {
   }
 
   .calendar-inner {
-    min-width: 560px;                /* 手机维持原来宽度，使用横向滚动 */
+    min-width: 0;
+    width: 100%;
   }
 
   .weekdays div {
@@ -647,6 +650,8 @@ body.exporting-pdf #pdfArea {
 
   .mini-label {
     font-size: 10px;
+    white-space: normal;
+    line-height: 1.2;
   }
 }
 
@@ -732,10 +737,12 @@ body.exporting-pdf #pdfArea {
 
 /* === Fix header overflow while keeping calendar scrollable === */
 
-/* Prevent the whole page from horizontal overflow */
+/* Prevent the whole page from horizontal overflow  */
+/*
 body {
   overflow-x: hidden;
 }
+*/
 
 /* Make header & controls not affected by wide calendar */
 .header, .month-nav, .header-actions {
