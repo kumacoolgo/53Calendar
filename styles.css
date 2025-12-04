@@ -79,9 +79,10 @@ body {
 .btn-today {
   font-size: 14px;
   font-weight: 600;
-  width: auto;
-  padding: 0 18px;
-  border-radius: 24px;
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border-radius: 50%;
 }
 
 /* Print button 只是普通图标按钮，沿用 .btn-icon */
@@ -90,18 +91,18 @@ body {
 }
 
 .btn-settings {
-  width: 64px;                /* 原 44px */
-  height: 64px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
-  background: var(--text-main);
-  color: white;
-  border: none;
-  box-shadow: 0 6px 10px -2px rgba(0, 0, 0, 0.18);
+  background: #ffffff;
+  color: var(--text-main);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
+  font-size: 20px;
 }
 
 .btn-settings:active {
