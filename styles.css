@@ -33,7 +33,8 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-top: 10px;
+  margin-bottom: 10px;
   padding: 0 8px;
 }
 
@@ -633,6 +634,7 @@ body.exporting-pdf #pdfArea {
   .calendar-inner {
     min-width: 0;
     width: 100%;
+    margin:0 0 0;
   }
 
   .weekdays div {
@@ -749,4 +751,5 @@ body {
   max-width: 100%;
   overflow-x: hidden;
 }
+
 
