@@ -165,8 +165,8 @@ body {
 
 .calendar-inner {
   width: 100%;
-  max-width: 900px;           /* 桌面最多 900px，窄屏缩小 */
-  margin: 0 auto;
+  max-width: 1275px;           /* 桌面最多 900px，窄屏缩小 */
+  margin: 10px 10px 10px;
 }
 
 .weekdays {
@@ -749,3 +749,4 @@ body {
   max-width: 100%;
   overflow-x: hidden;
 }
+
